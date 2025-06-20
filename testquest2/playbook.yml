@@ -1,0 +1,64 @@
+---
+- name: Install Docker and run project git
+  hosts: UbuntuSever
+  become: true
+  become_method: sudo
+  vars:
+    project_dir: "/opt/nginxtest"
+    git_repo: "https://github.com/nginx-proxy/nginx-proxy.git"
+  tasks:
+    - name: update packet
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: upgrade packet
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: yes
+
+    - name: install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: run and enable Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: install dep Docker-compose
+      apt:
+        name:
+          - python3-pip
+          - libffi-dev
+        state: present
+
+    - name: install Docker-compose for pip
+      pip:
+        name: docker-compose
+        state: present
+
+    # Работа с проектом
+    - name: create dir git
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+
+    - name: clone rep git
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ project_dir }}"
+        clone: yes
+        update: yes
+
+    - name: create network
+      command: docker network create www-network
+      ignore_errors: yes
+      changed_when: "'Error' not in create_network.stderr"
+      register: create_network
+
+    - name: run project for Docker Compose
+      command: docker-compose up -d
+      args:
+        chdir: "{{ project_dir }}"
